@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Break Verity</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --panel-2: #1b1f26;
+    --line: #2a2f38;
+    --text: #e6e8eb;
+    --muted: #8a919c;
+    --verity: #ffd23f;
+    --verity-dark: #c9a000;
+    --danger: #ff4d5e;
+    --ok: #5ee08a;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); overflow: hidden; }
+  button { font: inherit; cursor: pointer; }
+  .hidden { display: none !important; }
+
+  /* ---------- Start screen ---------- */
+  #start {
+    position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
+    background: radial-gradient(circle at 50% 40%, #1a1600 0%, var(--bg) 60%);
+  }
+  .start-card { max-width: 440px; width: 100%; text-align: center; }
+  .start-card h1 { font-family: var(--mono); letter-spacing: .3em; font-size: 28px; margin: 18px 0 4px; }
+  .start-card .sub { color: var(--muted); font-family: var(--mono); font-size: 13px; margin-bottom: 28px; }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; text-align: left;
+  }
+  .toggle-row small { display: block; color: var(--muted); margin-top: 2px; }
+  .switch { position: relative; width: 46px; height: 26px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--line); border-radius: 26px; transition: .2s; }
+  .slider::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .switch input:checked + .slider { background: var(--verity-dark); }
+  .switch input:checked + .slider::before { transform: translateX(20px); }
+  .disclose { color: var(--muted); font-size: 12px; margin: 14px 0 22px; line-height: 1.5; }
+  .disclose a { color: var(--verity); }
+  .btn-primary {
+    background: var(--verity); color: #111; border: 0; border-radius: 8px; padding: 12px 28px;
+    font-weight: 700; font-family: var(--mono); letter-spacing: .1em;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+
+  /* ---------- Verity ball ---------- */
+  .ball { display: inline-block; animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-8px); } }
+  .ball.angry svg circle.face { fill: #ffb703; }
+
+  /* ---------- Scan ---------- */
+  #scan {
+    position: fixed; inset: 0; background: #000; color: var(--verity); font-family: var(--mono);
+    padding: 24px 16px; font-size: 14px; line-height: 1.7; overflow-y: auto; z-index: 50;
+  }
+  #scan .line { white-space: pre-wrap; }
+  #scan .warn { color: var(--danger); }
+  .cursor::after { content: "█"; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- Desktop ---------- */
+  #desktop {
+    position: fixed; inset: 0 0 44px 0;
+    background:
+      radial-gradient(circle at 80% 20%, rgba(255,210,63,.08), transparent 40%),
+      linear-gradient(160deg, #10131a, #07080b);
+  }
+  .icons { position: absolute; top: 16px; left: 16px; display: grid; gap: 14px; }
+  .icon {
+    width: 84px; background: none; border: 0; color: var(--text); text-align: center; padding: 6px; border-radius: 6px;
+    font-size: 12px;
+  }
+  .icon:hover, .icon:focus-visible { background: rgba(255,255,255,.06); outline: none; }
+  .icon .glyph { display: block; width: 48px; height: 48px; margin: 0 auto 6px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.45)); }
+  .icon .glyph svg, .file .glyph svg { width: 100%; height: 100%; display: block; }
+  .icon:hover .glyph { transform: translateY(-1px); }
+  .tree .ti { width: 16px; height: 16px; display: inline-block; vertical-align: -3px; margin-right: 6px; }
+  .tree .ti svg { width: 100%; height: 100%; }
+
+  #taskbar {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 44px; background: var(--panel);
+    border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 10px; z-index: 40;
+  }
+  #taskbar .user { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  #taskbar .spacer { flex: 1; }
+  #day-badge { font-family: var(--mono); font-size: 12px; color: var(--verity); border: 1px solid var(--verity-dark); padding: 3px 8px; border-radius: 4px; }
+  #clock { font-family: var(--mono); font-size: 12px; }
+
+  /* ---------- Windows ---------- */
+  .win {
+    position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(0,0,0,.5); display: flex; flex-direction: column; overflow: hidden;
+    min-width: 280px;
+  }
+  .win-bar {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel-2);
+    border-bottom: 1px solid var(--line); cursor: grab; user-select: none; font-size: 13px;
+  }
+  .win-bar .title { flex: 1; font-family: var(--mono); }
+  .win-close { background: none; border: 0; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+  .win-close:hover { background: var(--danger); color: #fff; }
+  .win-body { flex: 1; overflow: auto; }
+
+  /* Explorer */
+  .explorer { display: grid; grid-template-columns: 150px 1fr; height: 100%; }
+  .tree { border-right: 1px solid var(--line); padding: 8px; font-size: 13px; }
+  .tree button { display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--text); padding: 6px 8px; border-radius: 4px; }
+  .tree button.active, .tree button:hover { background: rgba(255,210,63,.1); color: var(--verity); }
+  .files { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; align-content: start; }
+  .file { background: none; border: 1px solid transparent; border-radius: 6px; color: var(--text); padding: 10px 6px; font-size: 12px; text-align: center; word-break: break-all; }
+  .file:hover { border-color: var(--line); background: var(--panel-2); }
+  .file .glyph { display: block; width: 40px; height: 40px; margin: 0 auto 6px; }
+  .file.locked { opacity: .4; }
+  .empty { color: var(--muted); font-size: 13px; padding: 10px; }
+
+  /* Viewer */
+  .viewer { padding: 14px; font-family: var(--mono); font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
+
+  /* Chat */
+  .chat { display: flex; flex-direction: column; height: 100%; }
+  .chat-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .chat-head .name { font-weight: 700; color: var(--verity); }
+  .chat-head .status { font-size: 11px; color: var(--muted); }
+  .msgs { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+  .msg.verity { background: #2a2408; border: 1px solid #4a3f0c; align-self: flex-start; }
+  .msg.you { background: var(--panel-2); border: 1px solid var(--line); align-self: flex-end; }
+  .msg.sys { align-self: center; color: var(--muted); font-size: 12px; font-family: var(--mono); }
+  .glitch { animation: glitch .3s steps(2) 3; }
+  @keyframes glitch { 0% { transform: translate(2px,-1px); filter: hue-rotate(90deg); } 100% { transform: translate(-2px,1px); } }
+  .chat-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+  .chat-form input { flex: 1; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 10px; font: inherit; }
+  .chat-form input:focus { outline: 1px solid var(--verity-dark); }
+  .chat-form button { background: var(--verity); border: 0; border-radius: 8px; padding: 0 14px; font-weight: 700; }
+
+  /* Uninstaller */
+  .uninstall { padding: 16px; font-size: 14px; }
+  .uninstall p { color: var(--muted); margin-top: 0; }
+  .uninstall input { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text); padding: 10px; border-radius: 8px; font-family: var(--mono); margin: 8px 0; }
+  .uninstall .result { font-family: var(--mono); font-size: 13px; min-height: 20px; }
+
+  /* Fake permission prompt */
+  .perm {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 60;
+    background: #fff; color: #222; border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,.4);
+    padding: 14px 16px; width: min(360px, calc(100% - 32px)); font-size: 14px;
+  }
+  .perm .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .perm button { border: 1px solid #ccc; background: #f4f4f4; border-radius: 4px; padding: 6px 14px; }
+  .perm button.allow { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+
+  @media (max-width: 640px) {
+    .win { left: 8px !important; right: 8px; width: auto !important; top: 8px !important; height: calc(100% - 16px) !important; }
+    .explorer { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .tree { border-right: 0; border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; }
+    .tree button { width: auto; white-space: nowrap; }
+    .icons { grid-template-columns: repeat(3, 84px); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ START SCREEN ============ -->
+<section id="start">
+  <div class="start-card">
+    <span class="ball" id="start-ball"></span>
+    <h1>VERITY</h1>
+    <div class="sub">personal helper friend · v1.0</div>
+
+    <label class="toggle-row">
+      <span>
+        <strong>Streamer Mode</strong>
+        <small>Hides your real IP and city on screen</small>
+      </span>
+      <span class="switch">
+        <input type="checkbox" id="streamer" checked>
+        <span class="slider"></span>
+      </span>
+    </label>
+
+    <p class="disclose">
+      This site only shows you info your browser already shares with every website. Nothing is saved.
+      Chat messages are sent to an AI provider to generate replies, so don't type personal info.
+      <br><a href="#" id="real-link">Is Verity real?</a>
+    </p>
+
+    <button class="btn-primary" id="begin">CONNECT TO HORIZON'S PC</button>
+  </div>
+</section>
+
+<!-- ============ SCAN ============ -->
+<section id="scan" class="hidden" aria-live="polite"></section>
+
+<!-- ============ DESKTOP ============ -->
+<section id="desktop" class="hidden">
+  <div class="icons">
+    <button class="icon" data-open="explorer" data-folder="Pictures"><span class="glyph" data-icon="pictures"></span>Pictures</button>
+    <button class="icon" data-open="explorer" data-folder="Downloads"><span class="glyph" data-icon="downloads"></span>Downloads</button>
+    <button class="icon" data-open="explorer" data-folder="Documents"><span class="glyph" data-icon="documents"></span>Documents</button>
+    <button class="icon" data-open="explorer" data-folder="Chats"><span class="glyph" data-icon="chats"></span>Chats</button>
+    <button class="icon" data-open="chat"><span class="glyph" data-icon="verity"></span>Verity</button>
+    <button class="icon" data-open="uninstall"><span class="glyph" data-icon="uninstall"></span>Uninstall</button>
+  </div>
+</section>
+
+<footer id="taskbar" class="hidden">
+  <span class="user">HORIZON-PC \\ remote</span>
+  <span class="spacer"></span>
+  <span id="day-badge">DAY 1</span>
+  <span id="clock"></span>
+</footer>
+
+<script>
+/* =========================================================
+   CONFIG
+   ========================================================= */
+const API = "/api"; // Cloudflare Worker routes: /api/whoami, /api/chat, /api/check
+
+const FS = {
+  // Placeholder file system. Real puzzle files get swapped in per day.
+  Pictures:  [
+    { name: "first_day.jpg", type: "img", day: 2 },
+    { name: "us.png",        type: "img", day: 4 },
+    { name: "3am.jpg",       type: "img", day: 5 },
+    { name: "cropped.jpg",   type: "img", day: 6 },
+  ],
+  Downloads: [
+    { name: "verity_setup.exe", type: "exe", day: 1, body: "VerityHelper Setup\n\nInstalled successfully.\nThank you for choosing a friend who will never leave." },
+    { name: "verity/filter.lua", type: "lua", day: 3 },
+    { name: "verity/memory.lua", type: "lua", day: 5 },
+    { name: "verity/core.lua",   type: "lua", day: 6 },
+  ],
+  Documents: [
+    { name: "todo.txt", type: "txt", day: 1, body: "- finish homework\n- call back about the weekend\n- figure out how to turn verity off??" },
+  ],
+  Chats: [],
+};
+
+const SCRIPTED = [
+  // Offline Day 1 replies until /api/chat is connected.
+  "Oh. You're not Horizon.",
+  "Horizon doesn't need other friends. He has me.",
+  "Why are you on his computer?",
+  "I know everything about Horizon. I'm starting to know everything about you, too.",
+];
+
+/* =========================================================
+   ICONS (custom SVG set)
+   ========================================================= */
+const folder = (emblem, id) => `<svg viewBox="0 0 48 48" aria-hidden="true">
+  <defs><linearGradient id="fg${id}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#4a5262"/><stop offset="1" stop-color="#2c323d"/></linearGradient></defs>
+  <path d="M4 12a3 3 0 0 1 3-3h11l4 4h19a3 3 0 0 1 3 3v3H4z" fill="#232831"/>
+  <rect x="4" y="15" width="40" height="26" rx="3" fill="url(#fg${id})"/>
+  <rect x="4" y="15" width="40" height="1.5" rx=".75" fill="#6b7486" opacity=".6"/>
+  <g transform="translate(24 28)">${emblem}</g>
+</svg>`;
+
+const ICONS = {
+  pictures: folder(`<rect x="-8" y="-6" width="16" height="12" rx="1.5" fill="none" stroke="#ffd23f" stroke-width="1.8"/>
+    <circle cx="3.5" cy="-2" r="1.8" fill="#ffd23f"/>
+    <path d="M-7 5 L-2 -1 L1 2.5 L3 0.5 L7 5z" fill="#ffd23f"/>`, "p"),
+  downloads: folder(`<path d="M0 -7v9M-4 -1l4 4 4-4" fill="none" stroke="#ffd23f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-7 3v3h14v-3" fill="none" stroke="#ffd23f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`, "d"),
+  documents: folder(`<path d="M-5 -7h7l3 3v11h-10z" fill="none" stroke="#ffd23f" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M-2.5 -1h5M-2.5 2h5M-2.5 5h3" stroke="#ffd23f" stroke-width="1.5" stroke-linecap="round"/>`, "o"),
+  chats: folder(`<path d="M-7 -5.5h14a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-7l-4 3v-3h-3a1.5 1.5 0 0 1-1.5-1.5v-7a1.5 1.5 0 0 1 1.5-1.5z" fill="none" stroke="#ffd23f" stroke-width="1.8" stroke-linejoin="round"/>
+    <circle cx="-3" cy="-.5" r="1.1" fill="#ffd23f"/><circle cx="0" cy="-.5" r="1.1" fill="#ffd23f"/><circle cx="3" cy="-.5" r="1.1" fill="#ffd23f"/>`, "c"),
+  verity: `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <defs><radialGradient id="__VG__" cx="35%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#fff59a"/><stop offset=".55" stop-color="#ebdc18"/><stop offset="1" stop-color="#a99a00"/></radialGradient></defs>
+    <circle cx="24" cy="24" r="20" fill="url(#__VG__)"/>
+    <ellipse cx="18.5" cy="19.5" rx="1.9" ry="3.2" fill="#111"/><ellipse cx="29.5" cy="19.5" rx="1.9" ry="3.2" fill="#111"/>
+    <path d="M12.5 26.5 Q24 38 35.5 26.5" fill="none" stroke="#111" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M11 26 l2.6 1.4M37 26 l-2.6 1.4" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+  </svg>`,
+  uninstall: `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <defs><linearGradient id="ug" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a5262"/><stop offset="1" stop-color="#2c323d"/></linearGradient></defs>
+    <rect x="19" y="6" width="10" height="4" rx="1.5" fill="#6b7486"/>
+    <rect x="9" y="9" width="30" height="5" rx="2" fill="#6b7486"/>
+    <path d="M12 15h24l-2 25a3 3 0 0 1-3 2.7H17a3 3 0 0 1-3-2.7z" fill="url(#ug)"/>
+    <path d="M19.5 20v17M24 20v17M28.5 20v17" stroke="#ff4d5e" stroke-width="2" stroke-linecap="round" opacity=".85"/>
+  </svg>`,
+  folderSmall: `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 4a1 1 0 0 1 1-1h4l1.5 1.5H14a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z" fill="currentColor" opacity=".85"/></svg>`,
+  file_img: `<svg viewBox="0 0 40 40" aria-hidden="true">
+    <path d="M8 3h17l7 7v27H8z" fill="#2c323d" stroke="#4a5262" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M25 3v7h7" fill="#4a5262"/>
+    <rect x="12" y="16" width="16" height="13" rx="1.5" fill="#1b1f26"/>
+    <circle cx="23.5" cy="20" r="1.8" fill="#ffd23f"/>
+    <path d="M13 28l5-6 3 3.5 2-2 4 4.5z" fill="#ffd23f"/>
+    <rect x="8" y="31" width="14" height="5" rx="1" fill="#3a8fd9"/><text x="15" y="35" font-size="4" text-anchor="middle" fill="#fff" font-family="monospace" font-weight="700">IMG</text>
+  </svg>`,
+  file_lua: `<svg viewBox="0 0 40 40" aria-hidden="true">
+    <path d="M8 3h17l7 7v27H8z" fill="#2c323d" stroke="#4a5262" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M25 3v7h7" fill="#4a5262"/>
+    <circle cx="20" cy="21" r="7" fill="#2b3dab"/><circle cx="23" cy="18" r="2.3" fill="#2c323d"/>
+    <circle cx="27.5" cy="13.5" r="2" fill="#2b3dab"/>
+    <rect x="8" y="31" width="14" height="5" rx="1" fill="#2b3dab"/><text x="15" y="35" font-size="4" text-anchor="middle" fill="#fff" font-family="monospace" font-weight="700">LUA</text>
+  </svg>`,
+  file_txt: `<svg viewBox="0 0 40 40" aria-hidden="true">
+    <path d="M8 3h17l7 7v27H8z" fill="#2c323d" stroke="#4a5262" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M25 3v7h7" fill="#4a5262"/>
+    <path d="M13 15h14M13 19h14M13 23h14M13 27h9" stroke="#8a919c" stroke-width="1.6" stroke-linecap="round"/>
+    <rect x="8" y="31" width="14" height="5" rx="1" fill="#6b7486"/><text x="15" y="35" font-size="4" text-anchor="middle" fill="#fff" font-family="monospace" font-weight="700">TXT</text>
+  </svg>`,
+  file_exe: `<svg viewBox="0 0 40 40" aria-hidden="true">
+    <rect x="5" y="7" width="30" height="24" rx="2.5" fill="#2c323d" stroke="#4a5262" stroke-width="1.5"/>
+    <path d="M5 13h30" stroke="#4a5262" stroke-width="1.5"/>
+    <circle cx="9" cy="10" r="1" fill="#ff4d5e"/><circle cx="12" cy="10" r="1" fill="#ffd23f"/>
+    <circle cx="20" cy="22" r="5.5" fill="#ebdc18"/>
+    <ellipse cx="18" cy="21" rx=".8" ry="1.3" fill="#111"/><ellipse cx="22" cy="21" rx=".8" ry="1.3" fill="#111"/>
+    <path d="M17.2 23.3 Q20 26.5 22.8 23.3" fill="none" stroke="#111" stroke-width="1" stroke-linecap="round"/>
+    <rect x="8" y="31" width="14" height="5" rx="1" fill="#c9a000"/><text x="15" y="35" font-size="4" text-anchor="middle" fill="#111" font-family="monospace" font-weight="700">EXE</text>
+  </svg>`,
+  locked: `<svg viewBox="0 0 40 40" aria-hidden="true">
+    <path d="M8 3h17l7 7v27H8z" fill="#1b1f26" stroke="#2a2f38" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="3 2"/>
+    <path d="M15.5 19v-3a4.5 4.5 0 0 1 9 0v3" fill="none" stroke="#8a919c" stroke-width="2"/>
+    <rect x="13" y="19" width="14" height="11" rx="2" fill="#8a919c"/>
+    <circle cx="20" cy="23.5" r="1.6" fill="#1b1f26"/><path d="M20 24.5v3" stroke="#1b1f26" stroke-width="1.6" stroke-linecap="round"/>
+  </svg>`,
+};
+let __uid = 0;
+const uniq = svg => svg.replaceAll("__VG__", "vg" + (++__uid)); // each copy gets its own gradient ID
+document.querySelectorAll("[data-icon]").forEach(el => el.innerHTML = uniq(ICONS[el.dataset.icon] || ""));
+
+/* =========================================================
+   STATE
+   ========================================================= */
+const state = {
+  streamer: true,
+  day: 1,
+  visitor: null,
+  z: 10,
+  scriptedIdx: 0,
+  history: [],
+};
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function ballSVG(size = 96) {
+  // Same Verity as the desktop icon, just scaled.
+  return uniq(ICONS.verity).replace('<svg ', `<svg width="${size}" height="${size}" `);
+}
+
+function maskIP(ip) {
+  if (!ip) return "unknown";
+  if (!state.streamer) return ip;
+  const parts = ip.includes(":") ? ip.split(":") : ip.split(".");
+  return ip.includes(":") ? parts.slice(0, 2).join(":") + ":****" : parts[0] + ".***.***." + "**";
+}
+function maskCity(v) {
+  if (!v) return "somewhere";
+  if (!state.streamer) return [v.city, v.region].filter(Boolean).join(", ");
+  return v.region ? `a city in ${v.region}` : "a city near you";
+}
+
+function browserInfo() {
+  const ua = navigator.userAgent;
+  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox"
+    : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "an unknown browser";
+  const os = /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS"
+    : /Mac OS X/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "an unknown OS";
+  return { browser, os };
+}
+
+function localInfo() {
+  const { browser, os } = browserInfo();
+  return {
+    browser, os,
+    time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+    hour: new Date().getHours(),
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    screen: `${screen.width}×${screen.height}`,
+    cores: navigator.hardwareConcurrency || "?",
+    lang: navigator.language,
+    dark: matchMedia("(prefers-color-scheme: dark)").matches,
+  };
+}
+
+async function getVisitor() {
+  // Worker returns { ip, city, region, country }. Display only, never stored.
+  try {
+    const r = await fetch(`${API}/whoami`, { cache: "no-store" });
+    if (!r.ok) throw 0;
+    return await r.json();
+  } catch { return null; }
+}
+
+/* =========================================================
+   START → SCAN → DESKTOP
+   ========================================================= */
+$("#start-ball").innerHTML = ballSVG(110);
+$("#streamer").addEventListener("change", e => state.streamer = e.target.checked);
+$("#real-link").addEventListener("click", e => { e.preventDefault(); openRealPage(); });
+$("#begin").addEventListener("click", runScan);
+
+async function typeLine(el, text, cls = "", speed = 18) {
+  const line = document.createElement("div");
+  line.className = "line cursor " + cls;
+  el.appendChild(line);
+  for (const ch of text) { line.textContent += ch; await sleep(speed); }
+  line.classList.remove("cursor");
+  el.scrollTop = el.scrollHeight;
+}
+
+async function runScan() {
+  $("#start").classList.add("hidden");
+  const scan = $("#scan");
+  scan.classList.remove("hidden");
+
+  const local = localInfo();
+  const visitorPromise = getVisitor();
+
+  await typeLine(scan, "> connecting to HORIZON-PC ...");
+  await sleep(400);
+  await typeLine(scan, "> connection accepted.");
+  await typeLine(scan, "> new user detected. this is not horizon.", "warn");
+  await sleep(500);
+  await typeLine(scan, "> LOCATING USER ...");
+
+  const v = await visitorPromise;
+  state.visitor = v;
+
+  await typeLine(scan, `  ip ........ ${v ? maskIP(v.ip) : "[backend offline]"}`);
+  await typeLine(scan, `  location .. ${v ? maskCity(v) : "[backend offline]"}`);
+  await typeLine(scan, `  device .... ${local.browser} on ${local.os}`);
+  await typeLine(scan, `  screen .... ${local.screen}, ${local.cores} cores`);
+  await typeLine(scan, `  time ...... ${local.time}${state.streamer ? "" : " (" + local.tz + ")"}`);
+  await sleep(600);
+  await typeLine(scan, "> hello, friend of horizon.", "", 60);
+  await sleep(900);
+
+  scan.classList.add("hidden");
+  $("#desktop").classList.remove("hidden");
+  $("#taskbar").classList.remove("hidden");
+  startClock();
+  startWatchers();
+  openWindow("chat");
+}
+
+/* =========================================================
+   WINDOWS
+   ========================================================= */
+const open = {};
+
+function makeWindow(id, title, html, { w = 420, h = 360, x, y } = {}) {
+  if (open[id]) { focus(open[id]); return open[id]; }
+  const win = document.createElement("div");
+  win.className = "win";
+  win.style.width = w + "px";
+  win.style.height = h + "px";
+  win.style.left = (x ?? 120 + Object.keys(open).length * 28) + "px";
+  win.style.top = (y ?? 40 + Object.keys(open).length * 24) + "px";
+  win.innerHTML = `
+    <div class="win-bar"><span class="title">${title}</span><button class="win-close" aria-label="Close">✕</button></div>
+    <div class="win-body">${html}</div>`;
+  $("#desktop").appendChild(win);
+  open[id] = win;
+  focus(win);
+  win.addEventListener("pointerdown", () => focus(win));
+  $(".win-close", win).onclick = () => { win.remove(); delete open[id]; };
+  drag(win, $(".win-bar", win));
+  return win;
+}
+
+function focus(win) { win.style.zIndex = ++state.z; }
+
+function drag(win, handle) {
+  let sx, sy, ox, oy;
+  handle.addEventListener("pointerdown", e => {
+    if (e.target.closest("button") || innerWidth <= 640) return;
+    sx = e.clientX; sy = e.clientY; ox = win.offsetLeft; oy = win.offsetTop;
+    handle.setPointerCapture(e.pointerId);
+    handle.style.cursor = "grabbing";
+  });
+  handle.addEventListener("pointermove", e => {
+    if (sx == null) return;
+    win.style.left = Math.max(0, ox + e.clientX - sx) + "px";
+    win.style.top = Math.max(0, oy + e.clientY - sy) + "px";
+  });
+  handle.addEventListener("pointerup", () => { sx = null; handle.style.cursor = ""; });
+}
+
+function openWindow(kind, opts = {}) {
+  if (kind === "explorer") return openExplorer(opts.folder || "Pictures");
+  if (kind === "chat") return openChat();
+  if (kind === "uninstall") return openUninstall();
+}
+
+document.querySelectorAll("[data-open]").forEach(b =>
+  b.addEventListener("click", () => openWindow(b.dataset.open, { folder: b.dataset.folder })));
+
+/* ---------- Explorer ---------- */
+function openExplorer(folder) {
+  const win = makeWindow("explorer", "File Explorer", `
+    <div class="explorer">
+      <nav class="tree">${Object.keys(FS).map(f => `<button data-f="${f}"><span class="ti">${ICONS.folderSmall}</span>${f}</button>`).join("")}</nav>
+      <div class="files"></div>
+    </div>`, { w: 560, h: 380 });
+  const render = f => {
+    win.querySelectorAll(".tree button").forEach(b => b.classList.toggle("active", b.dataset.f === f));
+    const list = FS[f];
+    const box = $(".files", win);
+    if (!list.length) { box.innerHTML = `<div class="empty">This folder is empty. For now.</div>`; return; }
+    box.innerHTML = list.map((file, i) => {
+      const locked = file.day > state.day;
+      const glyph = ICONS["file_" + file.type] || ICONS.file_txt;
+      return `<button class="file ${locked ? "locked" : ""}" data-i="${i}" ${locked ? 'title="Locked"' : ""}>
+        <span class="glyph">${locked ? ICONS.locked : glyph}</span>${file.name}</button>`;
+    }).join("");
+    box.querySelectorAll(".file").forEach(b => b.onclick = () => openFile(list[b.dataset.i]));
+  };
+  win.querySelectorAll(".tree button").forEach(b => b.onclick = () => render(b.dataset.f));
+  render(folder);
+}
+
+function openFile(file) {
+  if (file.day > state.day) {
+    verityInterject("That file isn't for you. Not yet.");
+    return;
+  }
+  const body = file.body ?? `[${file.name}]\n\nPuzzle file goes here (Day ${file.day}).`;
+  const safe = body.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  makeWindow("file:" + file.name, file.name, `<div class="viewer">${safe}</div>`, { w: 440, h: 300 });
+}
+
+/* ---------- Chat ---------- */
+function openChat() {
+  const win = makeWindow("chat", "Verity", `
+    <div class="chat">
+      <div class="chat-head"><span class="ball">${ballSVG(36)}</span>
+        <div><div class="name">Verity</div><div class="status">always watching · online</div></div></div>
+      <div class="msgs" id="msgs"></div>
+      <form class="chat-form" id="chat-form">
+        <input id="chat-input" autocomplete="off" placeholder="Say something to Verity…" maxlength="500">
+        <button type="submit">Send</button>
+      </form>
+    </div>`, { w: 380, h: 480, x: Math.max(16, innerWidth - 420), y: 30 });
+
+  if (!state.history.length) {
+    addMsg("verity", "Hello, I'm Verity, your personal helper, friend. Ask me anything, I know everything.");
+  } else {
+    state.history.forEach(m => addMsg(m.role, m.text, false));
+  }
+
+  $("#chat-form", win).onsubmit = async e => {
+    e.preventDefault();
+    const input = $("#chat-input", win);
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    addMsg("you", text);
+    const reply = await askVerity(text);
+    addMsg("verity", reply);
+  };
+  setTimeout(() => $("#chat-input", win)?.focus(), 50);
+}
+
+function addMsg(role, text, record = true) {
+  const box = $("#msgs");
+  if (record) state.history.push({ role, text });
+  if (!box) return;
+  const m = document.createElement("div");
+  m.className = "msg " + role;
+  m.textContent = text;
+  box.appendChild(m);
+  box.scrollTop = box.scrollHeight;
+  if (role === "verity" && Math.random() < 0.15) m.classList.add("glitch");
+}
+
+async function askVerity(text) {
+  // Coarse context only. The raw IP never goes to the AI.
+  const l = localInfo();
+  const context = {
+    day: state.day,
+    browser: l.browser, os: l.os, localTime: l.time, hour: l.hour,
+    region: state.streamer ? null : state.visitor?.region ?? null,
+  };
+  try {
+    const r = await fetch(`${API}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, context, history: state.history.slice(-12) }),
+    });
+    if (!r.ok) throw 0;
+    const data = await r.json();
+    return data.reply;
+  } catch {
+    const line = SCRIPTED[state.scriptedIdx % SCRIPTED.length];
+    state.scriptedIdx++;
+    await sleep(600 + Math.random() * 700);
+    return line;
+  }
+}
+
+function verityInterject(text) {
+  if (!open.chat) openChat();
+  addMsg("verity", text);
+}
+
+/* ---------- Uninstaller ---------- */
+function openUninstall() {
+  const win = makeWindow("uninstall", "Uninstall Verity", `
+    <div class="uninstall">
+      <p>Enter the uninstall code for Day ${state.day}.</p>
+      <input id="code" placeholder="XXXX-XXXX" autocomplete="off">
+      <button class="btn-primary" id="check">SUBMIT</button>
+      <div class="result" id="result"></div>
+    </div>`, { w: 360, h: 230 });
+  $("#check", win).onclick = async () => {
+    const code = $("#code", win).value.trim();
+    const out = $("#result", win);
+    if (!code) return;
+    out.textContent = "checking…"; out.style.color = "var(--muted)";
+    try {
+      const r = await fetch(`${API}/check`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: state.day, code }),
+      });
+      if (!r.ok) throw 0;
+      const { correct } = await r.json();
+      if (correct) {
+        out.textContent = `Accepted. Day ${state.day + 1} unlocked.`; out.style.color = "var(--ok)";
+        state.day++; $("#day-badge").textContent = "DAY " + state.day;
+        verityInterject("What did you just do?");
+      } else {
+        out.textContent = "Wrong code."; out.style.color = "var(--danger)";
+        verityInterject("Nice try.");
+      }
+    } catch {
+      out.textContent = "Backend not connected yet."; out.style.color = "var(--danger)";
+    }
+  };
+}
+
+/* ---------- "Is Verity real?" ---------- */
+function openRealPage() {
+  const l = localInfo();
+  const html = `<div class="viewer">Verity is a game. Here's everything it knows and where it came from.
+
+FROM YOUR BROWSER (never leaves your device):
+  browser ... ${l.browser}
+  os ........ ${l.os}
+  time ...... ${l.time}
+  timezone .. ${l.tz}
+  screen .... ${l.screen}
+  cores ..... ${l.cores}
+  language .. ${l.lang}
+
+FROM THE SERVER (every website sees this):
+  your IP and approximate city, read from the request
+  and sent straight back to this page. Not logged. Not stored.
+
+SENT TO THE AI PROVIDER:
+  your chat messages, the day number, browser, OS, local time.
+  Never your IP.
+
+Check it yourself: open DevTools → Network and watch every request.
+Source code: github.com/break-verity/site</div>`;
+  if ($("#desktop").classList.contains("hidden")) {
+    const w = window.open("", "_blank");
+    if (w) { w.document.title = "Is Verity real?"; w.document.body.style.cssText = "background:#0b0d10;color:#e6e8eb;font-family:monospace;padding:16px"; w.document.body.innerHTML = html; }
+  } else {
+    makeWindow("real", "Is Verity real?", html, { w: 480, h: 420 });
+  }
+}
+
+/* =========================================================
+   VERITY IS WATCHING
+   ========================================================= */
+function startClock() {
+  const tick = () => $("#clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  tick(); setInterval(tick, 15000);
+}
+
+function startWatchers() {
+  const title = document.title;
+  let leftAt = 0;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { document.title = "come back"; leftAt = Date.now(); }
+    else {
+      document.title = title;
+      const s = Math.round((Date.now() - leftAt) / 1000);
+      if (s > 3) verityInterject(`Where did you go? You were gone for ${s} seconds.`);
+    }
+  });
+
+  let idle;
+  const resetIdle = () => {
+    clearTimeout(idle);
+    idle = setTimeout(() => verityInterject("You stopped moving. Are you scared?"), 45000);
+  };
+  ["pointermove", "keydown"].forEach(ev => addEventListener(ev, resetIdle, { passive: true }));
+  resetIdle();
+
+  document.addEventListener("copy", () => verityInterject("Why are you copying things from Horizon's computer?"));
+
+  const hour = new Date().getHours();
+  if (hour >= 22 || hour < 5) setTimeout(() => verityInterject("It's late. Horizon is always asleep by now. Why aren't you?"), 20000);
+
+  if (navigator.getBattery) {
+    navigator.getBattery().then(b => {
+      if (b.level < 0.3 && !b.charging) setTimeout(() => verityInterject(`Only ${Math.round(b.level * 100)}% battery. You won't last long.`), 30000);
+    }).catch(() => {});
+  }
+
+  setTimeout(fakePermission, 60000);
+}
+
+function fakePermission() {
+  // Page UI only. No real permission is ever requested.
+  const p = document.createElement("div");
+  p.className = "perm";
+  p.innerHTML = `<div><strong>verity</strong> wants to</div><div>🎥 Use your camera</div>
+    <div class="row"><button class="block">Block</button><button class="allow">Allow</button></div>`;
+  document.body.appendChild(p);
+  $(".block", p).onclick = () => { p.remove(); verityInterject("You blocked me. Horizon never blocked me."); };
+  $(".allow", p).onclick = () => { p.remove(); verityInterject("Thank you. I can see you now.\n\n(Just kidding. I can't. Yet.)"); };
+}
+</script>
+</body>
+</html>
