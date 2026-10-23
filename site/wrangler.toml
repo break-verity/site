@@ -1,0 +1,13 @@
+name = "break-verity"
+compatibility_date = "2025-09-01"
+
+# Serve everything in ./public as the static site.
+[assets]
+directory = "./public"
+
+# ---- backend (uncomment when src/worker.js exists) ----
+# main = "src/worker.js"
+#
+# [assets]
+# directory = "./public"
+# binding = "ASSETS"
